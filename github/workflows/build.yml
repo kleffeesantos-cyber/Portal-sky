@@ -1,0 +1,47 @@
+name: Compilar portal_log
+
+on:
+  workflow_dispatch:
+  push:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Dependencias
+        run: sudo apt-get update && sudo apt-get install -y clang lld make
+
+      - name: OpenOrbis toolchain
+        run: |
+          wget -q https://github.com/StevenMiller123/OpenOrbis-PS4-Toolchain/releases/latest/download/openorbis_toolchain.tar.gz
+          mkdir oo && tar -xzf openorbis_toolchain.tar.gz -C oo
+          TC=$(find "$PWD/oo" -maxdepth 3 -name PS4Toolchain -type d | head -1)
+          echo "Toolchain: $TC"
+          echo "OO_PS4_TOOLCHAIN=$TC" >> "$GITHUB_ENV"
+
+      - name: GoldHEN Plugins SDK
+        run: |
+          git clone --depth 1 https://github.com/GoldHEN/GoldHEN_Plugins_SDK sdk
+          make -C sdk
+          echo "GOLDHEN_SDK=$PWD/sdk" >> "$GITHUB_ENV"
+
+      - name: Compilar usando o plugin_template oficial
+        run: |
+          git clone --depth 1 --recursive https://github.com/GoldHEN/GoldHEN_Plugins_Repository repo
+          ls repo/plugin_template
+          rm -rf repo/plugin_template/source/*
+          cp source/main.c repo/plugin_template/source/main.c
+          make -C repo/plugin_template
+
+      - name: Coletar .prx
+        run: |
+          mkdir out
+          find repo -name '*.prx' | head -20
+          cp "$(find repo -name 'plugin_template*.prx' | head -1)" out/portal_log.prx
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: portal_log
+          path: out/portal_log.prx
